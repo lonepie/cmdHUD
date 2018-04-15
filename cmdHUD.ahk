@@ -1,5 +1,5 @@
-; Mintty quake console: Visor-like functionality for Windows
-; Version: 1.8
+; cmdHUD: mintty-quake-console for cmd.exe/powershell.exe/wsl.exe or anything, really!
+; Version: 0.1
 ; Author: Jon Rogers (lonepie@gmail.com)
 ; URL: https://github.com/lonepie/cmdHUD
 ; Credits:
