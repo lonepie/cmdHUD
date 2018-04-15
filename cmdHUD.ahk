@@ -73,12 +73,9 @@ else
     CheckWindowsStartup(startWithWindows)
 }
 
+cmdPath_orig := cmdPath
 cmdPath := ExpandEnvVars(cmdPath)
 cmdArgs := ExpandEnvVars(cmdArgs)
-
-; wsltty instead of cygwin
-if InStr(cmdPath, "wsltty")
-  SplitPath, cmdPath, , cygwinBinDir
 
 ; path to cmd
 cmdPath_args := cmdPath . " " . cmdArgs
@@ -88,6 +85,12 @@ heightConsoleWindow := initialHeight
 widthConsoleWindow := initialWidth
 
 isVisible := False
+if (animationMode == "fade") {
+    animationModeFade := 1
+}
+else if (animationMode == "slide") {
+    anmiationModeSlide := 1
+}
 
 ;*******************************************************************************
 ;               Hotkeys
@@ -97,9 +100,10 @@ Hotkey, %consoleHotkey%, ConsoleHotkey
 ;*******************************************************************************
 ;               Menu
 ;*******************************************************************************
-if !InStr(A_ScriptName, ".exe")
+if !InStr(A_ScriptName, ".exe") {
   Menu, Tray, Icon, %A_ScriptDir%\%SCRIPTNAME%.ico
-Menu, Tray, NoStandard
+  Menu, Tray, NoStandard
+}
 ; Menu, Tray, MainWindow
 Menu, Tray, Tip, %SCRIPTNAME% %VERSION%
 Menu, Tray, Click, 1
@@ -111,7 +115,7 @@ Menu, Tray, Add, Auto-Hide, ToggleAutoHide
 if (autohide)
     Menu, Tray, Check, Auto-Hide
 Menu, Tray, Add
-Menu, Tray, Add, Options, ShowOptionsGui
+; Menu, Tray, Add, Options, ShowOptionsGui
 Menu, Tray, Add, Edit Config, EditSettings
 Menu, Tray, Add, About, AboutDlg
 Menu, Tray, Add, Reload, ReloadSub
@@ -363,10 +367,6 @@ AboutDlg:
     MsgBox, 64, About, %SCRIPTNAME% AutoHotkey script`nVersion: %VERSION%`nAuthor: Jonathon Rogers <lonepie@gmail.com>`nURL: https://github.com/lonepie/cmdHUD
 return
 
-ShowOptionsGui:
-    OptionsGui()
-return
-
 EditSettings:
 EnvGet, envEditor, Editor
 if (StrLen(Trim(envEditor)) == 0)
@@ -447,7 +447,7 @@ return
 SaveSettings()
 {
     global
-    IniWrite, %cmdPath%, %iniFile%, General, cmd_path
+    IniWrite, %cmdPath_orig%, %iniFile%, General, cmd_path
     IniWrite, %cmdArgs%, %iniFile%, General, cmd_args
 
     ; Special case : If there is no key entered and both windows key and control key are checked
@@ -479,17 +479,19 @@ SaveSettings()
     }
 
     IniWrite, %consoleHotkey%, %iniFile%, General, hotkey
-    IniWrite, %startWithWindows%, %iniFile%, Display, start_with_windows
-    IniWrite, %startHidden%, %iniFile%, Display, start_hidden
+    IniWrite, %startWithWindows%, %iniFile%, General, start_with_windows
+    IniWrite, %startHidden%, %iniFile%, General, start_hidden
+    IniWrite, %autohide%, %iniFile%, General, autohide_by_default
+
     IniWrite, %heightConsoleWindow%, %iniFile%, Display, initial_height
     IniWrite, %widthConsoleWindow%, %iniFile%, Display, initial_width
     IniWrite, %initialTrans%, %iniFile%, Display, initial_trans
-    IniWrite, %autohide%, %iniFile%, Display, autohide_by_default
-    IniWrite, %animationModeSlide%, %iniFile%, Display, animation_mode_slide
-    IniWrite, %animationModeFade%, %iniFile%, Display, animation_mode_fade
-    IniWrite, %animationStep%, %inifile%, Display, animation_step
-    IniWrite, %animationTimeout%, %iniFile%, Display, animation_timeout
     IniWrite, %windowBorders%, %iniFile%, Display, window_borders
+    IniWrite, %displayOnMonitor%, %iniFile%, Display, display_on_monitor
+
+    IniWrite, %animationMode%, %iniFile%, Animation, animation_mode
+    IniWrite, %animationStep%, %inifile%, Animation, animation_step
+    IniWrite, %animationTimeout%, %iniFile%, Animation, animation_timeout
     CheckWindowsStartup(startWithWindows)
 }
 
@@ -509,82 +511,6 @@ CheckWindowsStartup(enable) {
     }
 }
 
-OptionsGui() {
-    global
-    If not WinExist("ahk_id" GuiID) {
-        Gui, Add, GroupBox, x12 y10 w450 h110 , General
-        Gui, Add, GroupBox, x12 y130 w450 h250 , Display
-        Gui, Add, Button, x242 y390 w100 h30 Default, Save
-        Gui, Add, Button, x362 y390 w100 h30 , Cancel
-        Gui, Add, Text, x22 y30 w70 h20 , Mintty Path:
-        Gui, Add, Edit, x92 y30 w250 h20 VcmdPath, %cmdPath%
-        Gui, Add, Button, x352 y30 w100 h20, Browse
-        Gui, Add, Text, x22 y60 w100 h20 , Mintty Arguments:
-        Gui, Add, Edit, x122 y60 w330 h20 VcmdArgs, %cmdArgs%
-        Gui, Add, Text, x22 y90 w100 h20 , Hotkey Trigger:
-        Gui, Add, Text, x232 y92 w10 h10, +
-        Gui, Add, CheckBox, x245 y89 w90 h20 VWindowsKey, Windows Key
-        Gui, Add, Text, x340 y92 w10 h10, +
-        Gui, Add, CheckBox, x360 y89 w80 h20 VControlKey, Control Key
-        ; If there is a # (Windows Key) in the consoleHotkey var, we remove it, as the Hotkey control doesn't support it, and we check the Windows Key checkbox
-        IfInString, consoleHotkey, #
-        {
-            GuiControl, , WindowsKey, 1
-            StringReplace, consoleHotkey, consoleHotkey, # , , All
-        }
-        Gui, Add, Hotkey, x122 y90 w100 h20 VconsoleHotkey, %consoleHotkey%
-        Gui, Add, CheckBox, x22 y150 w100 h30 VstartHidden Checked%startHidden%, Start Hidden
-        Gui, Add, CheckBox, x22 y180 w150 h30 Vautohide Checked%autohide%, Auto-Hide when focus is lost
-        Gui, Add, CheckBox, x22 y210 w120 h30 VstartWithWindows Checked%startWithWindows%, Start With Windows
-        Gui, Add, Text, x22 y250 w100 h20 , Initial Height (px):
-        Gui, Add, Edit, x22 y270 w100 h20 VinitialHeight, %heightConsoleWindow%
-        Gui, Add, Text, x22 y300 w115 h20 , Initial Width (percent):
-        Gui, Add, Edit, x22 y320 w100 h20 VinitialWidth, %widthConsoleWindow%
-
-        Gui, Add, GroupBox, x232 y150 w220 h45 , Animation Type:
-        Gui, Add, Radio, x252 y168 w70 h20 VanimationModeSlide group Checked%animationModeSlide%, Slide
-        Gui, Add, Radio, x332 y168 w70 h20 VanimationModeFade Checked%animationModeFade%, Fade
-
-        Gui, Add, Text, x232 y210 w220 h20 , Animation Delta (px):
-        Gui, Add, Text, x232 y260 w220 h20 , Animation Time (ms):
-        Gui, Add, Slider, x232 y230 w220 h30 VanimationStep Range1-100 TickInterval20 , %animationStep%
-        Gui, Add, Slider, x232 y280 w220 h30 VanimationTimeout Range1-50 TickInterval10, %animationTimeout%
-        Gui, Add, Text, x232 y310 w220 h20 , Window Transparency (`%):
-        Gui, Add, Slider, x232 y330 w220 h30 VinitialTrans Range100-255 , %initialTrans%
-        ; Gui, Add, Text, x232 y320 w220 h20 +Center, Animation Speed = Delta / Time
-    }
-    ; Generated using SmartGUI Creator 4.0
-    Gui, Show, h440 w482, %SCRIPTNAME% Options
-    Gui, +LastFound
-    GuiID := WinExist()
-
-    Loop {
-        ;sleep to reduce CPU load
-        Sleep, 100
-
-        ;exit endless loop, when settings GUI closes
-        If not WinExist("ahk_id" GuiID)
-            Break
-    }
-
-    ButtonSave:
-        Gui, Submit
-        SaveSettings()
-        Reload
-    return
-
-    ButtonBrowse:
-        FileSelectFile, SelectedPath, 3, %A_MyDocuments%, Path to cmd.exe, Executables (*.exe)
-        if SelectedPath !=
-            GuiControl,, MinttyPath, %SelectedPath%
-    return
-
-    GuiClose:
-    GuiEscape:
-    ButtonCancel:
-        Gui, Cancel
-    return
-}
 
 ;*******************************************************************************
 ;               Utility
