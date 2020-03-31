@@ -2,4 +2,7 @@
 
 ## unsupported: use for any executable
 
+## Planned features:
+ - Tabbed interface
+
 ### Version alpha 0.1
